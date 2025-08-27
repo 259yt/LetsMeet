@@ -12,7 +12,6 @@ DROP TABLE IF EXISTS phone_number;
 DROP TABLE IF EXISTS app_user;
 
 -- Tabelle für die Hauptbenutzerinformationen
-
 CREATE TABLE app_user
 (
     user_email    VARCHAR(255) PRIMARY KEY,
