@@ -26,7 +26,7 @@ CREATE TABLE app_user
 -- Tabelle für Adressinformationen
 CREATE TABLE address
 (
-    address_id   INT PRIMARY KEY,
+    address_id   INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     user_email   VARCHAR(255) REFERENCES app_user (user_email),
     street       VARCHAR(255),
     house_number VARCHAR(50),
@@ -48,7 +48,7 @@ CREATE TABLE phone_number
 -- Tabelle für Fotos
 CREATE TABLE photo
 (
-    photo_id           INT PRIMARY KEY,
+    photo_id           INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     user_email         VARCHAR(255) REFERENCES app_user (user_email),
     date               DATE,
     is_profile_picture BOOLEAN
@@ -59,7 +59,7 @@ CREATE TABLE photo
 -- Tabelle für Hobbys
 CREATE TABLE hobby
 (
-    hobby_id INT PRIMARY KEY,
+    hobby_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     name     VARCHAR(255)
 );
 
@@ -68,13 +68,14 @@ CREATE TABLE hobby
 -- Tabelle für Geschlechter
 CREATE TABLE gender
 (
-    gender_id   INT PRIMARY KEY,
+    gender_id   INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     gender_name VARCHAR(50)
 );
 
 ---
 
 -- Tabelle für Konversationen
+-- Nutzt die vorhandenen IDs, da sie in den Nachrichtenreferenzen benötigt werden
 CREATE TABLE conversation
 (
     conversation_id  INT PRIMARY KEY,
@@ -83,21 +84,10 @@ CREATE TABLE conversation
 
 ---
 
--- Zwischentabelle zur Verknüpfung von Benutzern und Hobbys
-CREATE TABLE user_hobby
-(
-    user_email VARCHAR(255) REFERENCES app_user (user_email),
-    hobby_id   INT REFERENCES hobby (hobby_id),
-    priority   INT,
-    PRIMARY KEY (user_email, hobby_id)
-);
-
----
-
 -- Zwischentabelle für die Freundschaftsbeziehung zwischen zwei Benutzern
 CREATE TABLE friendship
 (
-    friendship_id    INT PRIMARY KEY,
+    friendship_id    INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     user_id_1        VARCHAR(255) REFERENCES app_user (user_email),
     user_id_2        VARCHAR(255) REFERENCES app_user (user_email),
     status           VARCHAR(50),
@@ -110,7 +100,7 @@ CREATE TABLE friendship
 -- Zwischentabelle für Interessen (Likes)
 CREATE TABLE interest
 (
-    interest_id      INT PRIMARY KEY,
+    interest_id      INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     from_user_id     VARCHAR(255) REFERENCES app_user (user_email),
     to_user_id       VARCHAR(255) REFERENCES app_user (user_email),
     date_of_change   DATE,
@@ -132,10 +122,21 @@ CREATE TABLE gender_interest
 -- Tabelle für Nachrichten
 CREATE TABLE message
 (
-    message_id      INT PRIMARY KEY,
+    message_id      INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     conversation_id INT REFERENCES conversation (conversation_id),
     sender_id       VARCHAR(255) REFERENCES app_user (user_email),
     receiver_id     VARCHAR(255) REFERENCES app_user (user_email),
     text            TEXT,
     date_of_sending DATE
+);
+
+---
+
+-- Zwischentabelle zur Verknüpfung von Benutzern und Hobbys
+CREATE TABLE user_hobby
+(
+    user_email VARCHAR(255) REFERENCES app_user (user_email),
+    hobby_id   INT REFERENCES hobby (hobby_id),
+    priority   INT,
+    PRIMARY KEY (user_email, hobby_id)
 );
