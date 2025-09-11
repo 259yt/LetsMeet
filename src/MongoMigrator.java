@@ -3,61 +3,67 @@ import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
-public class FullPostgresMigrator {
+public class MongoMigrator {
 
-    // Ersetzen Sie dies mit Ihren tatsächlichen Werten
-    private static final String MONGO_URI = "mongodb://localhost:27017";
-    private static final String MONGO_DB = "LetsMeet";
-
+    // Datenbank-Konstanten
     private static final String PG_URL = "jdbc:postgresql://localhost:5433/lf8_lets_meet_db";
     private static final String PG_USER = "user";
     private static final String PG_PASSWORD = "secret";
 
+    // MongoDB-Konstanten
+    private static final String MONGO_URI = "mongodb://localhost:27017";
+    private static final String MONGO_DB = "LetsMeet";
+
     public static void main(String[] args) {
+        System.out.println("Starte MongoDB-Datenmigration...");
+
         try (MongoClient mongoClient = MongoClients.create(MONGO_URI);
              Connection pgConnection = DriverManager.getConnection(PG_URL, PG_USER, PG_PASSWORD)) {
+            pgConnection.setAutoCommit(false); // Transaktionen aktivieren
+            MongoDatabase mongoDb = mongoClient.getDatabase(MONGO_DB);
 
-            System.out.println("Verbindung zu MongoDB und PostgreSQL hergestellt.");
+            // Migrationsmethoden aufrufen
+            migrateUsers(mongoDb, pgConnection);
+            migrateFriendships(mongoDb, pgConnection);
+            migrateInterests(mongoDb, pgConnection);
+            migrateConversations(mongoDb, pgConnection);
+            migrateMessages(mongoDb, pgConnection);
 
-            // Migration der Hauptbenutzerdaten
-            migrateUsers(mongoClient, pgConnection);
-
-            // Migration der Beziehungen
-            migrateFriendships(mongoClient, pgConnection);
-            migrateInterests(mongoClient, pgConnection);
-
-            // Zuerst Konversationen migrieren, dann Nachrichten
-            migrateConversations(mongoClient, pgConnection);
-            migrateMessages(mongoClient, pgConnection);
-
-            System.out.println("Vollständige Migration abgeschlossen.");
-
+            pgConnection.commit(); // Transaktion abschließen
+            System.out.println("MongoDB-Datenmigration erfolgreich abgeschlossen.");
+        } catch (SQLException e) {
+            System.err.println("Datenbankfehler während der MongoDB-Migration: " + e.getMessage());
+            e.printStackTrace();
         } catch (Exception e) {
+            System.err.println("MongoDB-Migration fehlgeschlagen: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    private static void migrateUsers(MongoClient mongoClient, Connection pgConnection) throws Exception {
-        System.out.println("Migriere Benutzer...");
-        MongoDatabase mongoDb = mongoClient.getDatabase(MONGO_DB);
+    private static void migrateUsers(MongoDatabase mongoDb, Connection pgConnection) throws Exception {
+        System.out.println("Migriere MongoDB Benutzer...");
         MongoCollection<Document> usersCollection = mongoDb.getCollection("users");
 
-        String userSql = "INSERT INTO app_user (user_email, first_name, last_name, gender, date_of_birth) VALUES (?, ?, ?, ?, ?)";
+        String userSql = "INSERT INTO app_user (user_email, first_name, last_name, gender, date_of_birth) " +
+                "VALUES (?, ?, ?, ?, ?) " +
+                "ON CONFLICT (user_email) DO UPDATE SET " +
+                "first_name = COALESCE(EXCLUDED.first_name, app_user.first_name), " +
+                "last_name = COALESCE(EXCLUDED.last_name, app_user.last_name), " +
+                "gender = COALESCE(EXCLUDED.gender, app_user.gender), " +
+                "date_of_birth = COALESCE(EXCLUDED.date_of_birth, app_user.date_of_birth)";
 
         try (PreparedStatement userStmt = pgConnection.prepareStatement(userSql)) {
-            pgConnection.prepareStatement("DELETE FROM app_user").executeUpdate();
-
             for (Document userDoc : usersCollection.find()) {
                 String email = userDoc.getString("_id");
                 String fullName = userDoc.getString("name");
@@ -79,20 +85,16 @@ public class FullPostgresMigrator {
                 userStmt.setNull(5, java.sql.Types.DATE);
                 userStmt.executeUpdate();
             }
-            System.out.println("Benutzerdaten erfolgreich migriert.");
         }
+        System.out.println("MongoDB Benutzerdaten erfolgreich migriert.");
     }
 
-    private static void migrateFriendships(MongoClient mongoClient, Connection pgConnection) throws Exception {
-        System.out.println("Migriere Freundschaften...");
-        MongoDatabase mongoDb = mongoClient.getDatabase(MONGO_DB);
+    private static void migrateFriendships(MongoDatabase mongoDb, Connection pgConnection) throws Exception {
+        System.out.println("Migriere MongoDB Freundschaften...");
         MongoCollection<Document> usersCollection = mongoDb.getCollection("users");
 
-        String friendshipSql = "INSERT INTO friendship (\"user_id_1\", \"user_id_2\") VALUES (?, ?)";
-
+        String friendshipSql = "INSERT INTO friendship (user_id_1, user_id_2) VALUES (?, ?) ON CONFLICT (user_id_1, user_id_2) DO NOTHING";
         try (PreparedStatement friendshipStmt = pgConnection.prepareStatement(friendshipSql)) {
-            pgConnection.prepareStatement("DELETE FROM friendship").executeUpdate();
-
             for (Document userDoc : usersCollection.find()) {
                 String userEmailFrom = userDoc.getString("_id");
                 List<String> friends = userDoc.getList("friends", String.class);
@@ -105,78 +107,78 @@ public class FullPostgresMigrator {
                     }
                 }
             }
-            System.out.println("Freundschaften erfolgreich migriert.");
         }
+        System.out.println("MongoDB Freundschaften erfolgreich migriert.");
     }
 
-    private static void migrateInterests(MongoClient mongoClient, Connection pgConnection) throws Exception {
-        System.out.println("Migriere Interessen...");
-        MongoDatabase mongoDb = mongoClient.getDatabase(MONGO_DB);
+    private static void migrateInterests(MongoDatabase mongoDb, Connection pgConnection) throws Exception {
+        System.out.println("Migriere MongoDB Interessen...");
         MongoCollection<Document> usersCollection = mongoDb.getCollection("users");
 
-        String interestsSql = "INSERT INTO interest (\"from_user_id\", \"to_user_id\", \"date_of_creation\") VALUES (?, ?, NOW())";
-
+        String interestsSql = "INSERT INTO interest (from_user_id, to_user_id, date_of_creation) VALUES (?, ?, NOW()) ON CONFLICT (from_user_id, to_user_id) DO NOTHING";
         try (PreparedStatement interestsStmt = pgConnection.prepareStatement(interestsSql)) {
-            pgConnection.prepareStatement("DELETE FROM interest").executeUpdate();
-
             for (Document userDoc : usersCollection.find()) {
                 String userEmail = userDoc.getString("_id");
-                List<Document> likes = userDoc.getList("likes", Document.class);
 
-                if (likes != null) {
-                    for (Document likeDoc : likes) {
+                // Versuche, die 'likes' als Liste von Dokumenten zu erhalten
+                List<Document> likesAsDocuments = userDoc.getList("likes", Document.class);
+                if (likesAsDocuments != null) {
+                    for (Document likeDoc : likesAsDocuments) {
                         interestsStmt.setString(1, userEmail);
                         interestsStmt.setString(2, likeDoc.getString("liked_email"));
                         interestsStmt.executeUpdate();
                     }
+                } else {
+                    // Falls nicht als Dokumente, versuche es als Liste von Strings zu erhalten
+                    List<String> likesAsStrings = userDoc.getList("likes", String.class);
+                    if (likesAsStrings != null) {
+                        for (String likedEmail : likesAsStrings) {
+                            interestsStmt.setString(1, userEmail);
+                            interestsStmt.setString(2, likedEmail);
+                            interestsStmt.executeUpdate();
+                        }
+                    }
                 }
             }
-            System.out.println("Interessen erfolgreich migriert.");
         }
+        System.out.println("MongoDB Interessen erfolgreich migriert.");
     }
 
-    private static void migrateConversations(MongoClient mongoClient, Connection pgConnection) throws Exception {
-        System.out.println("Sammle und migriere Konversationen...");
-        MongoDatabase mongoDb = mongoClient.getDatabase(MONGO_DB);
+    private static void migrateConversations(MongoDatabase mongoDb, Connection pgConnection) throws Exception {
+        System.out.println("Sammle und migriere MongoDB Konversationen...");
         MongoCollection<Document> usersCollection = mongoDb.getCollection("users");
-
         Set<Integer> conversationIds = new HashSet<>();
+
         for (Document userDoc : usersCollection.find()) {
             List<Document> messages = userDoc.getList("messages", Document.class);
             if (messages != null) {
                 for (Document messageDoc : messages) {
                     Integer conversationId = messageDoc.getInteger("conversation_id");
-                    conversationIds.add(conversationId);
+                    if (conversationId != null) {
+                        conversationIds.add(conversationId);
+                    }
                 }
             }
         }
 
-        // Fügt die conversation_id manuell ein, um die Fremdschlüsselintegrität zu erhalten
-        String conversationSql = "INSERT INTO conversation (conversation_id, date_of_creation) VALUES (?, NOW())";
+        String conversationSql = "INSERT INTO conversation (conversation_id, date_of_creation) VALUES (?, NOW()) ON CONFLICT (conversation_id) DO NOTHING";
         try (PreparedStatement conversationStmt = pgConnection.prepareStatement(conversationSql)) {
-            pgConnection.prepareStatement("DELETE FROM conversation").executeUpdate();
-
             for (Integer convId : conversationIds) {
                 conversationStmt.setInt(1, convId);
                 conversationStmt.executeUpdate();
             }
         }
-        System.out.println("Konversationen erfolgreich migriert.");
+        System.out.println("MongoDB Konversationen erfolgreich migriert.");
     }
 
-    private static void migrateMessages(MongoClient mongoClient, Connection pgConnection) throws Exception {
-        System.out.println("Migriere Nachrichten...");
-        MongoDatabase mongoDb = mongoClient.getDatabase(MONGO_DB);
+    private static void migrateMessages(MongoDatabase mongoDb, Connection pgConnection) throws Exception {
+        System.out.println("Migriere MongoDB Nachrichten...");
         MongoCollection<Document> usersCollection = mongoDb.getCollection("users");
 
-        // message_id wird automatisch generiert, daher nicht im INSERT enthalten
-        String messageSql = "INSERT INTO message (\"conversation_id\", \"sender_id\", \"receiver_id\", \"text\", \"date_of_sending\") VALUES (?, ?, ?, ?, ?)";
-
+        String messageSql = "INSERT INTO message (conversation_id, sender_id, receiver_id, text, date_of_sending) VALUES (?, ?, ?, ?, ?)";
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
         try (PreparedStatement messageStmt = pgConnection.prepareStatement(messageSql)) {
-            pgConnection.prepareStatement("DELETE FROM message").executeUpdate();
-
             for (Document userDoc : usersCollection.find()) {
                 String senderEmail = userDoc.getString("_id");
                 List<Document> messages = userDoc.getList("messages", Document.class);
@@ -188,18 +190,26 @@ public class FullPostgresMigrator {
                         String text = messageDoc.getString("message");
                         String timestampString = messageDoc.getString("timestamp");
 
-                        LocalDateTime messageDate = LocalDateTime.parse(timestampString, formatter);
+                        LocalDateTime messageDate = null;
+                        if (timestampString != null) {
+                            try {
+                                messageDate = LocalDateTime.parse(timestampString, formatter);
+                            } catch (Exception e) {
+                                System.err.println("Fehler beim Parsen des Datums: " + timestampString);
+                                continue;
+                            }
+                        }
 
                         messageStmt.setInt(1, conversationId);
                         messageStmt.setString(2, senderEmail);
                         messageStmt.setString(3, receiverEmail);
                         messageStmt.setString(4, text);
-                        messageStmt.setTimestamp(5, Timestamp.valueOf(messageDate));
+                        messageStmt.setTimestamp(5, messageDate != null ? Timestamp.valueOf(messageDate) : null);
                         messageStmt.executeUpdate();
                     }
                 }
             }
-            System.out.println("Nachrichten erfolgreich migriert.");
         }
+        System.out.println("MongoDB Nachrichten erfolgreich migriert.");
     }
 }

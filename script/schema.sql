@@ -1,15 +1,15 @@
-DROP TABLE IF EXISTS address;
-DROP TABLE IF EXISTS photo;
-DROP TABLE IF EXISTS interest;
-DROP TABLE IF EXISTS friendship;
-DROP TABLE IF EXISTS gender_interest;
-DROP TABLE IF EXISTS gender;
-DROP TABLE IF EXISTS message;
-DROP TABLE IF EXISTS conversation;
-DROP TABLE IF EXISTS user_hobby;
-DROP TABLE IF EXISTS hobby;
-DROP TABLE IF EXISTS phone_number;
-DROP TABLE IF EXISTS app_user;
+DROP TABLE IF EXISTS address CASCADE;
+DROP TABLE IF EXISTS photo CASCADE;
+DROP TABLE IF EXISTS interest CASCADE;
+DROP TABLE IF EXISTS friendship CASCADE;
+DROP TABLE IF EXISTS gender_interest CASCADE;
+DROP TABLE IF EXISTS gender CASCADE;
+DROP TABLE IF EXISTS message CASCADE;
+DROP TABLE IF EXISTS conversation CASCADE;
+DROP TABLE IF EXISTS user_hobby CASCADE;
+DROP TABLE IF EXISTS hobby CASCADE;
+DROP TABLE IF EXISTS phone_number CASCADE;
+DROP TABLE IF EXISTS app_user CASCADE;
 
 -- Tabelle für die Hauptbenutzerinformationen
 CREATE TABLE app_user
@@ -60,7 +60,7 @@ CREATE TABLE photo
 CREATE TABLE hobby
 (
     hobby_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    name     VARCHAR(255)
+    name     VARCHAR(255) UNIQUE
 );
 
 ---
@@ -92,7 +92,8 @@ CREATE TABLE friendship
     user_id_2        VARCHAR(255) REFERENCES app_user (user_email),
     status           VARCHAR(50),
     date_of_change   DATE,
-    date_of_creation DATE
+    date_of_creation DATE,
+    UNIQUE (user_id_1, user_id_2)
 );
 
 ---
@@ -104,7 +105,8 @@ CREATE TABLE interest
     from_user_id     VARCHAR(255) REFERENCES app_user (user_email),
     to_user_id       VARCHAR(255) REFERENCES app_user (user_email),
     date_of_change   DATE,
-    date_of_creation DATE
+    date_of_creation DATE,
+    UNIQUE (from_user_id, to_user_id)
 );
 
 ---

@@ -2,6 +2,8 @@
 <project version="4">
   <component name="SqlDialectMappings">
     <file url="file://$PROJECT_DIR$/script/schema.sql" dialect="PostgreSQL" />
-    <file url="file://$PROJECT_DIR$/src/FullPostgresMigrator.java" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/src/ExcelMigrator.java" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/src/MigrationTester.java" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/src/MongoMigrator.java" dialect="PostgreSQL" />
   </component>
 </project>
