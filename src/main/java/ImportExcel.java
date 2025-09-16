@@ -16,6 +16,7 @@ public class ImportExcel {
     private static final String DB_PASSWORD = "secret";
     private static final String EXCEL_FILE_PATH = "Lets Meet DB Dump.xlsx";
 
+
     public static void main(String[] args) {
         System.out.println("Starte Excel-Import...");
 
